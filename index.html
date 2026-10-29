@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="sr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Košarkaška Liga - Fizičko</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50: '#fff7ed', 500: '#f97316', 600: '#ea580c', 700: '#c2410c' }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Firebase SDK (v9 Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans transition-colors duration-300">
+
+    <!-- Header -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-brand-500 text-white p-2.5 rounded-xl shadow-md text-xl font-black">
+                    <i class="fa-solid fa-basketball"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-extrabold tracking-wider uppercase text-white">Košarkaška Liga <span class="text-brand-500">Fizičko</span></h1>
+                    <p class="text-xs text-slate-400">Povezano uživo preko Firebase-a</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <div id="adminBadge" class="hidden items-center bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1.5 rounded-lg text-xs font-bold">
+                    <i class="fa-solid fa-shield-halved mr-1.5"></i> ADMIN AKTIVAN
+                </div>
+                <button onclick="toggleAdminModal()" id="adminBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-xl text-sm font-semibold border border-slate-700 transition flex items-center shadow">
+                    <i class="fa-solid fa-lock mr-2 text-brand-500" id="adminIcon"></i> <span id="adminBtnText">Admin Prijava</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 py-8 space-y-10">
+
+        <!-- Standings Table -->
+        <section class="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                <h2 class="text-lg font-bold flex items-center text-white">
+                    <i class="fa-solid fa-trophy text-amber-400 mr-2"></i> Tabela Lige
+                </h2>
+                <span class="text-xs text-slate-400">POB=2, POR=1</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider bg-slate-950/50">
+                            <th class="py-3 px-4 font-semibold text-center w-12">#</th>
+                            <th class="py-3 px-4 font-semibold">Tim</th>
+                            <th class="py-3 px-4 font-semibold text-center">U</th>
+                            <th class="py-3 px-4 font-semibold text-center">P</th>
+                            <th class="py-3 px-4 font-semibold text-center">I</th>
+                            <th class="py-3 px-4 font-semibold text-center">+ / -</th>
+                            <th class="py-3 px-4 font-semibold text-center">Bod</th>
+                            <th class="py-3 px-4 font-semibold text-center admin-only hidden">Akcija</th>
+                        </tr>
+                    </thead>
+                    <tbody id="standingsBody" class="divide-y divide-slate-800/60 text-sm"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Teams and Players Grid -->
+        <section class="space-y-6">
+            <div class="flex justify-between items-center">
+                <h2 class="text-xl font-black text-white flex items-center">
+                    <i class="fa-solid fa-users text-brand-500 mr-2"></i> Timovi i Igrači
+                </h2>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" id="teamsContainer"></div>
+        </section>
+
+    </main>
+
+    <!-- Admin Modal -->
+    <div id="adminModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-6">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold text-white flex items-center">
+                    <i class="fa-solid fa-key text-brand-500 mr-2"></i> Admin Prijava
+                </h3>
+                <button onclick="toggleAdminModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div id="loginFormSection" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Unesi Admin PIN (PIN: 1234)</label>
+                    <input type="password" id="pinInput" placeholder="Unesi PIN..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-brand-500">
+                </div>
+                <div id="pinError" class="text-rose-400 text-xs hidden">Pogrešan PIN! Pokušaj ponovo.</div>
+                <div class="flex space-x-3 pt-2">
+                    <button onclick="checkAdminLogin()" class="flex-1 bg-brand-600 hover:bg-brand-500 text-white font-bold py-3 rounded-xl transition">Prijavi se</button>
+                    <button onclick="toggleAdminModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-3 rounded-xl transition">Otkaži</button>
+                </div>
+            </div>
+            <div id="adminSettingsSection" class="border-t border-slate-800 pt-4 hidden space-y-3">
+                <p class="text-xs text-emerald-400 font-semibold mb-2"><i class="fa-solid fa-circle-check mr-1"></i> Uspešno si prijavljen kao administrator.</p>
+                <button onclick="logoutAdmin()" class="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 py-2.5 rounded-xl text-sm font-bold transition">Odjavi se</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Team Stats Modal -->
+    <div id="teamModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold text-white" id="modalTeamTitle">Izmeni Tim</h3>
+                <button onclick="closeTeamModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <input type="hidden" id="editTeamIndex">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Odigrano utakmica (U)</label>
+                    <input type="number" id="editPlayed" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Pobede (P - 2 boda)</label>
+                    <input type="number" id="editWins" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Porazi (I - 1 bod)</label>
+                    <input type="number" id="editLosses" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Koš razlika (+ / -)</label>
+                    <input type="number" id="editDiff" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-white" placeholder="npr. +15 ili -5">
+                </div>
+                <div class="flex space-x-3 pt-2">
+                    <button onclick="saveTeamStats()" class="flex-1 bg-brand-600 hover:bg-brand-500 text-white font-bold py-2.5 rounded-xl transition">Sačuvaj</button>
+                    <button onclick="closeTeamModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2.5 rounded-xl transition">Otkaži</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Logic & Firebase -->
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            databaseURL: "https://fizicko-liga-default-rtdb.firebaseio.com"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // Default Data
+        const defaultData = {
+            teams: [
+                { name: "KK Mladost GAT", played: 0, wins: 0, losses: 0, diff: 0, players: ["Aljoša", "Vukašin", "Luka", "Stefan"] },
+                { name: "KK Feniks", played: 0, wins: 0, losses: 0, diff: 0, players: ["Nikola", "Marko", "Miloš", "Uroš"] },
+                { name: "KK Dolina Dabrova", played: 0, wins: 0, losses: 0, diff: 0, players: ["Đorđe", "Petar", "Filip", "Aleksa"] }
+            ]
+        };
+
+        let leagueData = defaultData;
+        let isAdmin = localStorage.getItem("fizicko_admin") === "true";
+
+        // Reference to Firebase
+        const dbRef = db.ref('liga');
+
+        dbRef.on('value', (snapshot) => {
+            const val = snapshot.val();
+            if (val) {
+                leagueData = val;
+            } else {
+                dbRef.set(defaultData);
+                leagueData = defaultData;
+            }
+            renderApp();
+        }, (error) => {
+            console.error("Firebase error:", error);
+            renderApp();
+        });
+
+        function renderApp() {
+            updateAdminUI();
+            renderStandings();
+            renderTeams();
+        }
+
+        function updateAdminUI() {
+            const adminBadge = document.getElementById('adminBadge');
+            const adminBtnText = document.getElementById('adminBtnText');
+            const adminIcon = document.getElementById('adminIcon');
+            const adminOnlyElements = document.querySelectorAll('.admin-only');
+            const loginFormSection = document.getElementById('loginFormSection');
+            const adminSettingsSection = document.getElementById('adminSettingsSection');
+
+            if (isAdmin) {
+                adminBadge.classList.remove('hidden');
+                adminBadge.classList.add('flex');
+                adminBtnText.textContent = "Admin Podešavanja";
+                adminIcon.className = "fa-solid fa-shield-halved mr-2 text-emerald-400";
+                adminOnlyElements.forEach(el => el.classList.remove('hidden'));
+                loginFormSection.classList.add('hidden');
+                adminSettingsSection.classList.remove('hidden');
+            } else {
+                adminBadge.classList.add('hidden');
+                adminBadge.classList.remove('flex');
+                adminBtnText.textContent = "Admin Prijava";
+                adminIcon.className = "fa-solid fa-lock mr-2 text-brand-500";
+                adminOnlyElements.forEach(el => el.classList.add('hidden'));
+                loginFormSection.classList.remove('hidden');
+                adminSettingsSection.classList.add('hidden');
+            }
+        }
+
+        function toggleAdminModal() {
+            const modal = document.getElementById('adminModal');
+            modal.classList.toggle('hidden');
+            document.getElementById('pinInput').value = '';
+            document.getElementById('pinError').classList.add('hidden');
+        }
+
+        function checkAdminLogin() {
+            const pin = document.getElementById('pinInput').value;
+            if (pin === "1234") {
+                isAdmin = true;
+                localStorage.setItem("fizicko_admin", "true");
+                toggleAdminModal();
+                renderApp();
+            } else {
+                document.getElementById('pinError').classList.remove('hidden');
+            }
+        }
+
+        function logoutAdmin() {
+            isAdmin = false;
+            localStorage.setItem("fizicko_admin", "false");
+            toggleAdminModal();
+            renderApp();
+        }
+
+        function renderStandings() {
+            const tbody = document.getElementById('standingsBody');
+            tbody.innerHTML = '';
+
+            // Calculate points: Win = 2 pts, Loss = 1 pt
+            const sortedTeams = [...leagueData.teams].map((team, index) => {
+                const points = (team.wins || 0) * 2 + (team.losses || 0) * 1;
+                return { ...team, originalIndex: index, points };
+            }).sort((a, b) => {
+                if (b.points !== a.points) return b.points - a.points;
+                return (b.diff || 0) - (a.diff || 0);
+            });
+
+            sortedTeams.forEach((team, idx) => {
+                const diffFormatted = (team.diff > 0 ? '+' : '') + (team.diff || 0);
+                const diffColor = team.diff > 0 ? 'text-emerald-400' : team.diff < 0 ? 'text-rose-400' : 'text-slate-400';
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-800/40 transition border-b border-slate-800/40";
+                tr.innerHTML = `
+                    <td class="py-3.5 px-4 text-center font-bold text-slate-400">${idx + 1}</td>
+                    <td class="py-3.5 px-4 font-bold text-white flex items-center space-x-2">
+                        <span>${team.name}</span>
+                    </td>
+                    <td class="py-3.5 px-4 text-center text-slate-300">${team.played || 0}</td>
+                    <td class="py-3.5 px-4 text-center text-emerald-400 font-semibold">${team.wins || 0}</td>
+                    <td class="py-3.5 px-4 text-center text-rose-400 font-semibold">${team.losses || 0}</td>
+                    <td class="py-3.5 px-4 text-center font-semibold ${diffColor}">${diffFormatted}</td>
+                    <td class="py-3.5 px-4 text-center font-black text-brand-500 text-base">${team.points}</td>
+                    <td class="py-3.5 px-4 text-center admin-only ${isAdmin ? '' : 'hidden'}">
+                        <button onclick="openTeamModal(${team.originalIndex})" class="bg-slate-800 hover:bg-brand-600 text-slate-300 hover:text-white px-3 py-1 rounded-lg text-xs font-bold transition">
+                            <i class="fa-solid fa-pen-to-square"></i> Izmeni
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderTeams() {
+            const container = document.getElementById('teamsContainer');
+            container.innerHTML = '';
+
+            leagueData.teams.forEach((team, index) => {
+                const card = document.createElement('div');
+                card.className = "bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between space-y-4";
+                
+                let playersHtml = team.players.map(p => `
+                    <li class="bg-slate-950/60 border border-slate-800/80 px-3 py-2 rounded-xl text-slate-300 text-sm flex items-center justify-between">
+                        <span><i class="fa-solid fa-user text-brand-500 mr-2 text-xs"></i> ${p}</span>
+                    </li>
+                `).join('');
+
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-800">
+                            <h3 class="font-extrabold text-white text-lg flex items-center">
+                                <i class="fa-solid fa-shield-halved text-brand-500 mr-2"></i> ${team.name}
+                            </h3>
+                            <span class="text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded-lg font-semibold">Tim #${index + 1}</span>
+                        </div>
+                        <h4 class="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-2">Sastav tima:</h4>
+                        <ul class="space-y-2 mb-4">
+                            ${playersHtml}
+                        </ul>
+                    </div>
+                    <div class="admin-only ${isAdmin ? '' : 'hidden'} pt-2 border-t border-slate-800/80">
+                        <button onclick="openTeamModal(${index})" class="w-full bg-slate-800 hover:bg-brand-600 text-slate-200 hover:text-white py-2 rounded-xl text-xs font-bold transition flex items-center justify-center">
+                            <i class="fa-solid fa-sliders mr-1.5"></i> Ažuriraj učinak tima
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function openTeamModal(index) {
+            const team = leagueData.teams[index];
+            document.getElementById('editTeamIndex').value = index;
+            document.getElementById('modalTeamTitle').textContent = "Izmeni: " + team.name;
+            document.getElementById('editPlayed').value = team.played || 0;
+            document.getElementById('editWins').value = team.wins || 0;
+            document.getElementById('editLosses').value = team.losses || 0;
+            document.getElementById('editDiff').value = team.diff || 0;
+            
+            document.getElementById('teamModal').classList.remove('hidden');
+        }
+
+        function closeTeamModal() {
+            document.getElementById('teamModal').classList.add('hidden');
+        }
+
+        function saveTeamStats() {
+            const index = parseInt(document.getElementById('editTeamIndex').value);
+            leagueData.teams[index].played = parseInt(document.getElementById('editPlayed').value) || 0;
+            leagueData.teams[index].wins = parseInt(document.getElementById('editWins').value) || 0;
+            leagueData.teams[index].losses = parseInt(document.getElementById('editLosses').value) || 0;
+            leagueData.teams[index].diff = parseInt(document.getElementById('editDiff').value) || 0;
+
+            dbRef.set(leagueData).then(() => {
+                closeTeamModal();
+            }).catch((err) => {
+                alert("Greška pri čuvanju u bazu: " + err.message);
+            });
+        }
+    </script>
+</body>
+</html>
